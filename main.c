@@ -1,4 +1,6 @@
+#include <stdbool.h>
 #include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
 
 typedef struct {
@@ -19,15 +21,23 @@ JsonObject *getObject(JsonArray *array, char *key);
 JsonArray parse_json(char *json, JsonArray *array);
 
 int main(void) {
-  char *json = "{\"test\":5,\"string\":\"str\"}";
+  char *json = "{\"test\":\"str\",\"string\":\"str\"}";
   JsonArray arr;
   arr.size = 16;
   parse_json(json, &arr);
-  JsonObject *obj = getObject(&arr, "testa");
+  JsonObject *obj = getObject(&arr, "test");
+  JsonObject *secObj = getObject(&arr, "string");
   if (obj != NULL) {
 
-    printf("Key in the array is %s \n", obj->key);
+    printf("Object with key %s in the array and value %s  \n", obj->key,
+           obj->value);
   }
+  if (secObj != NULL) {
+
+    printf("Second Object with key %s in the array and value %s  \n",
+           secObj->key, secObj->value);
+  }
+
   return 1;
 }
 
@@ -47,6 +57,7 @@ unsigned int put_in_JsonObject(JsonArray *array, char *key, char *value) {
     printf("ERROR: The cell its not empty!\n");
   } else {
     strcpy(array->jsonObjects[index].key, key);
+    strcpy(array->jsonObjects[index].value, value);
     array->jsonObjects[index].valid = 1;
     return 1;
   }
@@ -58,35 +69,45 @@ JsonObject *getObject(JsonArray *array, char *key) {
   if (result->valid == 1) {
     return result;
   } else {
-    printf("ERROR: No such object, suck ass!\n");
+    printf("ERROR: No such object with key %s , suck ass!\n", key);
     return NULL;
   }
 }
 
 JsonArray parse_json(char *json, JsonArray *array) {
-  char *value;
+  char *value = NULL;
   int starting = 0;
   int ending = 0;
-  int startOrEnd = 1;
-  for (int x = 0; x < sizeof(json); x++) {
-    // printf("%c  start: %d , end:%d \n", json[x], starting, ending);
+  bool start = true;
+  char *key = NULL;
+  bool valueStarting = false;
+  for (int x = 0; x < strlen(json); x++) {
     if (json[x] == '\"') {
-      if (startOrEnd == 1) {
+      // parsing string
+      if (start) {
         starting = x + 1;
-        startOrEnd = 0;
+        start = false;
       } else {
         ending = x - 1;
-        startOrEnd = 1;
+        start = true;
       }
     }
     if (json[x] == ':') {
-      int i = 0;
-      char key[ending - 1];
-      char value[ending];
-      memcpy(key, &json[starting], ending - 1);
-      printf("the key is %s\n", key);
-
+      int key_len = ending - starting;
+      key = (char *)malloc(key_len + 1);
+      strncpy(key, &json[starting], key_len + 1);
+      starting = 0;
+      ending = 0;
+    }
+    if (json[x] == ',' || json[x] == '}') {
+      int valueLength = ending - starting;
+      value = (char *)malloc(valueLength + 1);
+      strncpy(value, &json[starting], valueLength + 1);
       put_in_JsonObject(array, key, value);
+      starting = 0;
+      ending = 0;
+      free(key);
+      free(value);
     }
   }
 }

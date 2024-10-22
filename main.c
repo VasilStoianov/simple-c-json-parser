@@ -33,10 +33,10 @@ unsigned int put_in_JsonObject(JsonArray *array, char *key, char *value,
                                JsonValueType type);
 JsonObject *getObject(JsonArray *array, char *key);
 
-JsonArray parse_json(char *json, JsonArray *array);
+void parse_json(char *json, JsonArray *array);
 
 int main(void) {
-  char *json = "{\"test\":\"str\",\"string\":\"str\",\"intvalue\":5}";
+  char *json = "{\"test\":\"str\",\"intvalue\":55555,\"string\":\"str\"}";
   JsonArray arr;
   arr.size = 16;
   parse_json(json, &arr);
@@ -111,64 +111,84 @@ JsonObject *getObject(JsonArray *array, char *key) {
   }
 }
 
-JsonArray parse_json(char *json, JsonArray *array) {
+void parse_json(char *json, JsonArray *array) {
   char *value = NULL;
   int starting = 0;
   int ending = 0;
   bool start = true;
   char *key = NULL;
-  for (int x = 0; x < strlen(json); x++) {
+  bool parsingStarted = true;
+  bool validJson = false;
+  bool stopLoop = false;
+  for (int x = 0; x < strlen(json) && !stopLoop; x++) {
+    if (json[x] == '{' && parsingStarted) {
+      printf("Starting to parse\n");
+      validJson = true;
+      parsingStarted = false;
+    }
+    if (validJson) {
+      switch (json[x]) {
+      case '\"': {
+        // parsing string
+        if (start) {
+          starting = x + 1;
+          start = false;
+        } else {
+          ending = x - 1;
+          start = true;
+        }
+        break;
+      };
+      case ':': {
+        int key_len = ending - starting;
+        key = (char *)malloc(key_len + 1);
 
-    switch (json[x]) {
-    case '\"': {
-      // parsing string
-      if (start) {
-        starting = x + 1;
-        start = false;
-      } else {
-        ending = x - 1;
-        start = true;
-      }
-      break;
-    };
-    case ':': {
-      int key_len = ending - starting;
-      key = (char *)malloc(key_len + 1);
+        strncpy(key, &json[starting], key_len + 1);
+        ending = 0;
+        if (isdigit(json[x + 1])) {
+          starting = x + 1;
+        } else {
+          starting = 0;
+        }
+        break;
+      };
+      case ',':
+        if (json[x + 1] == ',' || json[x - 1] == ',') {
+          printf("ERROR: Invalid Json");
+          stopLoop = true;
+          break;
+        }
+      case '}': {
+        JsonValueType valueType;
+        if (ending == 0 && isdigit(json[x - 1]) && starting != 0) {
 
-      strncpy(key, &json[starting], key_len + 1);
-      ending = 0;
-      if (isdigit(json[x + 1])) {
-        starting = x + 1;
-      } else {
+          valueType = JSON_VALUE_INT;
+          ending = x - 1;
+        }
+        if (json[starting] == 't' || json[starting] == 'T' ||
+            json[starting] == 'f' || json[starting] == 'F') {
+          valueType = JSON_VALUE_BOOLEAN;
+        }
+        if (isalpha(json[starting])) {
+          valueType = JSON_VALUE_STRING;
+        }
+        int valueLength = ending - starting;
+        value = (char *)malloc(valueLength + 1);
+        strncpy(value, &json[starting], valueLength + 1);
+        put_in_JsonObject(array, key, value, valueType);
         starting = 0;
+        ending = 0;
+        free(key);
+        free(value);
+        break;
+      };
+      default: {
+        break;
       }
-      break;
-    };
-    case ',':
-    case '}': {
-      JsonValueType valueType;
-      if (ending == 0 && isdigit(json[x - 1]) && starting != 0) {
-
-        valueType = JSON_VALUE_INT;
-        ending = x - 1;
       }
-      if (json[starting] == 't' || json[starting] == 'T' ||
-          json[starting] == 'f' || json[starting] == 'F') {
-        valueType = JSON_VALUE_BOOLEAN;
-      }
-      if (isalpha(json[starting])) {
-        valueType = JSON_VALUE_STRING;
-      }
-      int valueLength = ending - starting;
-      value = (char *)malloc(valueLength + 1);
-      strncpy(value, &json[starting], valueLength + 1);
-      put_in_JsonObject(array, key, value, valueType);
-      starting = 0;
-      ending = 0;
-      free(key);
-      free(value);
-      break;
-    };
+    } else {
+      printf("ERROR: Invalid json");
+      return;
     }
   }
 }
